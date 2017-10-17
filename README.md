@@ -9,3 +9,6 @@ Vous trouverez dans ce repo le fichier Json qui concerne le template ARM qui a �
 
 ## Automation runbook
 Vous trouverez également dans ce repo le script Powershell qui ciblent les ressources d'après une balise personalisée et qui active le cryptage du Blob Storage ainsi que la création du NSG et l'association avec le sous réseau. Il y aura bien entendu le Json du template ARM du groupe de ressource cible.
+
+
+Pour plus d'exemple de template rendez-vous sur le lien suivant : https://github.com/Azure/azure-quickstart-templates

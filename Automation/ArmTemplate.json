@@ -1,0 +1,166 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "win2008stoType": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_ZRS",
+        "Standard_GRS",
+        "Standard_RAGRS",
+        "Premium_LRS"
+      ]
+    },
+    "win2008vmName": {
+      "type": "string",
+      "minLength": 1,
+      "defaultValue": "Win2008VM"
+    },
+    "win2008vmAdminUserName": {
+      "type": "string",
+      "minLength": 1,
+      "defaultValue": "admWin2008"
+    },
+    "win2008vmAdminPassword": {
+      "type": "securestring"
+    },
+    "win2008vmWindowsOSVersion": {
+      "type": "string",
+      "defaultValue": "2008-R2-SP1",
+      "allowedValues": [
+        "2008-R2-SP1"
+      ]
+    }
+    },
+  "variables": {
+    "win2008stoName": "[concat('win2008sto', uniqueString(resourceGroup().id))]",
+    "win2008vnetPrefix": "192.168.0.0/16",
+    "win2008vnetSubnet1Name": "Subnet-1",
+    "win2008vnetSubnet1Prefix": "192.168.0.0/24",
+    "win2008vmImagePublisher": "MicrosoftWindowsServer",
+    "win2008vmImageOffer": "WindowsServer",
+    "win2008vmOSDiskName": "win2008vmOSDisk",
+    "win2008vmVmSize": "Standard_D2_v2",
+    "win2008vmVnetID": "[resourceId('Microsoft.Network/virtualNetworks', 'win2008vnet')]",
+    "win2008vmSubnetRef": "[concat(variables('win2008vmVnetID'), '/subnets/', variables('win2008vnetSubnet1Name'))]",
+    "win2008vmStorageAccountContainerName": "vhds",
+    "win2008vmNicName": "[concat(parameters('win2008vmName'), 'NetworkInterface')]"
+    },
+  "resources": [
+    {
+      "name": "[variables('win2008stoName')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-01-01",
+      "sku": {
+        "name": "[parameters('win2008stoType')]"
+      },
+      "dependsOn": [ ],
+      "tags": {
+        "displayName": "win2008sto",
+        "securityRule": "encryption"
+      },
+      "kind": "Storage"
+    },
+    {
+      "name": "win2008vnet",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [ ],
+      "tags": {
+        "displayName": "win2008vnet"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('win2008vnetPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('win2008vnetSubnet1Name')]",
+            "properties": {
+              "addressPrefix": "[variables('win2008vnetSubnet1Prefix')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "[variables('win2008vmNicName')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', 'win2008vnet')]"
+      ],
+      "tags": {
+        "displayName": "win2008vmNic"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('win2008vmSubnetRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "[parameters('win2008vmName')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('win2008stoName'))]",
+        "[resourceId('Microsoft.Network/networkInterfaces', variables('win2008vmNicName'))]"
+      ],
+      "tags": {
+        "displayName": "win2008vm",
+        "securityRule": "networkgroup"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('win2008vmVmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('win2008vmName')]",
+          "adminUsername": "[parameters('win2008vmAdminUsername')]",
+          "adminPassword": "[parameters('win2008vmAdminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('win2008vmImagePublisher')]",
+            "offer": "[variables('win2008vmImageOffer')]",
+            "sku": "[parameters('win2008vmWindowsOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "win2008vmOSDisk",
+            "vhd": {
+              "uri": "[concat(reference(resourceId('Microsoft.Storage/storageAccounts', variables('win2008stoName')), '2016-01-01').primaryEndpoints.blob, variables('win2008vmStorageAccountContainerName'), '/', variables('win2008vmOSDiskName'), '.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('win2008vmNicName'))]"
+            }
+          ]
+        }
+      }
+    }
+    ],
+  "outputs": {}
+}

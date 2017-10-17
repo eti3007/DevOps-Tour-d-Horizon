@@ -1,0 +1,127 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "planappName": {
+      "type": "string",
+      "minLength": 1,
+      "defaultValue": "planapp"
+    },
+    "planappSkuName": {
+      "type": "string",
+      "defaultValue": "F1",
+      "allowedValues": [
+        "F1",
+        "D1",
+        "B1",
+        "B2",
+        "B3",
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "metadata": {
+        "description": "Describes plan's pricing tier and capacity. Check details at https://azure.microsoft.com/en-us/pricing/details/app-service/"
+      }
+    },
+    "storageType": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_ZRS",
+        "Standard_GRS",
+        "Standard_RAGRS",
+        "Premium_LRS"
+      ]
+    },
+    "stoIsDevEnv": {
+      "type": "string",
+      "defaultValue": "true",
+      "allowedValues": [
+        "true",
+        "false"
+      ]
+    },
+    "stoDevName": {
+      "type": "string",
+      "defaultValue": "demodevsto"
+    },
+    "stoProdName": {
+      "type": "string",
+      "defaultValue": "demosto"
+    }
+  },
+  "variables": {
+    "webappName": "[concat('webapp', uniqueString(resourceGroup().id))]",
+    "storageName": "[concat(if(equals(parameters('stoIsDevEnv'), 'true'), parameters('stoDevName'), parameters('stoProdName')), uniqueString(resourceGroup().id))]",
+    "stocnvalue": "[concat('DefaultEndpointsProtocol=https;AccountName=', concat(variables('storageName'), ';AccountKey='))]"
+  },
+  "resources": [
+    {
+      "name": "[parameters('planappName')]",
+      "type": "Microsoft.Web/serverfarms",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-08-01",
+      "sku": {
+        "name": "[parameters('planappSkuName')]"
+      },
+      "dependsOn": [ ],
+      "tags": {
+        "displayName": "planapp"
+      },
+      "properties": {
+        "name": "[parameters('planappName')]",
+        "numberOfWorkers": 1
+      }
+    },
+    {
+      "name": "[variables('webappName')]",
+      "type": "Microsoft.Web/sites",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-08-01",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', parameters('planappName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]"
+      ],
+      "tags": {
+        "[concat('hidden-related:', resourceId('Microsoft.Web/serverfarms', parameters('planappName')))]": "Resource",
+        "displayName": "webapp"
+      },
+      "properties": {
+        "name": "[variables('webappName')]",
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('planappName'))]"
+      },
+      "resources": [
+        {
+          "name": "appsettings",
+          "type": "config",
+          "apiVersion": "2015-08-01",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/sites', variables('webappName'))]"
+          ],
+          "tags": {
+            "displayName": "settings"
+          },
+          "properties": {
+            "StorageConnectionString": "[concat(variables('stocnvalue'), listKeys(resourceId('Microsoft.Storage/storageAccounts',variables('storageName')), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).keys[0].value)]"
+          }
+        }
+      ]
+    },
+    {
+      "name": "[variables('storageName')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-01-01",
+      "sku": {
+        "name": "[parameters('storageType')]"
+      },
+      "dependsOn": [ ],
+      "tags": {
+        "displayName": "storage"
+      },
+      "kind": "Storage"
+    }],
+  "outputs": {}
+}

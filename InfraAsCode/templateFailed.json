@@ -1,0 +1,229 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "dnsNameForPublicIP": {
+           "type": "string",
+           "metadata": {
+                "description": "Nom unique du DNS pour l'IP publique"
+            }
+        },
+        "adminUserName": {
+           "type": "string",
+           "metadata": {
+                "description": "Login du compte admin de la VM"
+            }
+        },
+        "adminPassword": {
+           "type": "securestring",
+           "metadata": {
+                "description": "Mot de passe du compte admin de la VM"
+            }
+        },
+        "windowsOSVersion": {
+           "type": "string",
+           "defaultValue": "2012-R2-Datacenter-smalldisk",
+           "allowedValues": [
+               "2008-R2-SP1",
+               "2012-R2-Datacenter",
+               "2012-R2-Datacenter-smalldisk"
+           ],
+           "metadata": {
+                "description": "Version de Windows pour la VM"
+            }
+        },
+        "moduleName": {
+            "type": "string",
+            "metadata": {
+              "description": "URL for the DSC configuration module."
+            }
+        }
+    },
+    "variables": {
+        "addressPrefix": "10.0.0.0/16",
+        "subnetPrefix": "10.0.0.0/24",
+        "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', 'demovm-VirtualNetwork')]",
+        "subnetRef": "[concat(variables('vnetId'), '/subnets/demovm-VirtualNetwork-Subnet')]"
+    },
+    "resources": [
+        {
+        "type": "Microsoft.Storage/storageAccounts",
+        "name": "[toLower('demovm0918storage')]",
+        "apiVersion": "2015-06-15",
+        "location": "[resourceGroup().location]",
+        "tags": {
+            "displayName": "demovm Storage Account"
+        },
+        "properties": {
+            "accountType": "Standard_LRS"
+        }
+    },
+    {
+        "apiVersion": "2015-06-15",
+        "type": "Microsoft.Network/publicIPAddresses",
+        "name": "demovm-PublicIP",
+        "location": "[resourceGroup().location]",
+        "tags": {
+            "displayName": "PublicIPAddress"
+        },
+        "properties": {
+            "publicIPAllocationMethod": "Dynamic",
+            "dnsSettings": {
+                "domainNameLabel": "[parameters('dnsNameForPublicIP')]"
+            }
+        }
+    },
+    {
+        "apiVersion": "2015-06-15",
+        "type": "Microsoft.Network/virtualNetworks",
+        "name": "demovm-VirtualNetwork",
+        "location": "[resourceGroup().location]",
+        "tags": {
+            "displayName": "VirtualNetwork"
+        },
+        "properties": {
+            "addressSpace": {
+                "addressPrefixes": [
+                    "[variables('addressPrefix1')]"
+                ]
+            },
+            "subnets": [
+                {
+                    "name": "demovm-VirtualNetwork-Subnet",
+                    "properties": {
+                        "addressPrefix": "[variables('subnetPrefix1')]"
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "apiVersion": "2015-06-15",
+        "type": "Microsoft.Network/networkInterfaces",
+        "name": "demovm-NetworkInterface",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+            "Microsoft.Network/publicIPAddresses/demovm-PublicIP",
+            "Microsoft.Network/virtualNetworks/demovm-VirtualNetwork"
+        ],
+        "tags": {
+            "displayName": "demovm Network Interface"
+        },
+        "properties": {
+            "ipConfigurations": [
+                {
+                    "name": "ipconfig1",
+                    "properties": {
+                        "privateIPAllocationMethod": "Dynamic",
+                        "publicIPAddress": {
+                            "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'demovm-PublicIP')]"
+                        },
+                        "subnet": {
+                            "id": "[variables('subnetRef1')]"
+                        }
+                    }
+                }
+            ],
+            "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'demoNsg')]"
+            }
+        }
+    },
+    {
+        "apiVersion": "2017-03-30",
+        "type": "Microsoft.Compute/virtualMachines",
+        "name": "demovm",
+        "location": "[resourceGroup().location]",
+        "identity":{
+            "type":"SystemAssigned"
+        },
+        "dependsOn": [
+            "[concat('Microsoft.Storage/storageAccounts/', toLower('demovm0918storage'))]",
+            "Microsoft.Network/networkInterfaces/demovm-NetworkInterface"
+        ],
+        "tags": {
+            "displayName": "demovm",
+            "BusinessUnit": "FINANCE"
+        },
+        "properties": {
+            "hardwareProfile": {
+                "vmSize": "Standard_A2"
+            },
+            "osProfile": {
+                "computerName": "demovm",
+                "adminUsername": "[parameters('adminUserName')]",
+                "adminPassword": "[parameters('adminPassword')]"
+            },
+            "storageProfile": {
+                "imageReference": {
+                    "publisher": "MicrosoftWindowsServer",
+                    "offer": "WindowsServer",
+                    "sku": "[parameters('windowsOSVersion')]",
+                    "version": "latest"
+                },
+                "osDisk": {
+                    "name": "demovmOSDisk",
+                    "caching": "ReadWrite",
+                    "createOption": "FromImage"
+                }
+            },
+            "networkProfile": {
+                "networkInterfaces": [
+                    {
+                        "id": "[resourceId('Microsoft.Network/networkInterfaces', 'demovm-NetworkInterface')]"
+                    }
+                ]
+            },
+            "diagnosticsProfile": {
+                "bootDiagnostics": {
+                    "enabled": true,
+                    "storageUri": "[concat('http://', toLower('demovm0918storage'), '.blob.core.windows.net')]"
+                }
+            }
+        },
+        "resources": [
+        ]
+    },
+    {
+        "type": "Microsoft.Compute/virtualMachines/extensions",
+        "name": "demovm/dscExtension",
+        "apiVersion": "2015-05-01-preview",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+          "Microsoft.Compute/virtualMachines/demovm"
+        ],
+        "properties": {
+          "publisher": "Microsoft.Powershell",
+          "type": "DSC",
+          "typeHandlerVersion": "2.19",
+          "autoUpgradeMinorVersion": true,
+          "protectedSettings": null
+        }
+    },
+    {
+        "apiVersion": "2017-06-01",
+        "type": "Microsoft.Network/networkSecurityGroups",
+        "name": "demoNsg",
+        "location": "[resourceGroup().location]",
+        "properties": {
+            "securityRules": [
+                {
+                    "name": "rdp_rule",
+                    "properties": {
+                      "description": "Open bar RDP",
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "3389",
+                      "sourceAddressPrefix": "Internet",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 100,
+                      "direction": "Inbound"
+                    }
+                  }
+            ]
+        }
+    }
+],
+    "outputs": {}
+}

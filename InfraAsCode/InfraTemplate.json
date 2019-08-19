@@ -5,7 +5,7 @@
     "planappName": {
       "type": "string",
       "minLength": 1,
-      "defaultValue": "planapp"
+      "defaultValue": "razorlogplan"
     },
     "planappSkuName": {
       "type": "string",
@@ -21,7 +21,7 @@
         "S3"
       ],
       "metadata": {
-        "description": "Describes plan's pricing tier and capacity. Check details at https://azure.microsoft.com/en-us/pricing/details/app-service/"
+        "description": ""
       }
     },
     "storageType": {
@@ -53,7 +53,7 @@
     }
   },
   "variables": {
-    "webappName": "[concat('webapp', uniqueString(resourceGroup().id))]",
+    "webappName": "[concat('razorlogapp', uniqueString(resourceGroup().id))]",
     "storageName": "[concat(if(equals(parameters('stoIsDevEnv'), 'true'), parameters('stoDevName'), parameters('stoProdName')), uniqueString(resourceGroup().id))]",
     "stocnvalue": "[concat('DefaultEndpointsProtocol=https;AccountName=', concat(variables('storageName'), ';AccountKey='))]"
   },
